@@ -67,7 +67,7 @@ def format_custom_date(d):
 
 #The start of the cycle
 month_index = 0
-current_day = 7
+current_day = 6
 
 
 def shids():
@@ -92,9 +92,6 @@ def next_days_off():
         if day.inWork == ShiftType.OFF:
             days_off.append(day)
     return days_off
-
-for day in next_days_off():
-    print(day)
 
 
 
