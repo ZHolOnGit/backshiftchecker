@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from itertools import islice, cycle
 
 # Anchor date: the first day of the rota cycle
-ANCHOR_DATE = date(2026, 1, 7)
+ANCHOR_DATE = date(2026, 1, 6)
 
 class ShiftType(Enum):
     DAYS = "DAYS"

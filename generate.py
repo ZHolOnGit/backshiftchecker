@@ -175,32 +175,34 @@ def write_pwa_assets():
         json.dump(manifest, f, indent=2)
     print(f"  wrote {manifest_path}")
 
-    sw = """\
-const CACHE = 'rota-v1';
-const ASSETS = ['./'];
-
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS))
-  );
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    import time
+    cache_key = f"rota-{int(time.time())}"
+    sw = (
+        f"const CACHE = '{cache_key}';\n"
+        "const ASSETS = ['./'];\n"
+        "\n"
+        "self.addEventListener('install', e => {\n"
+        "  e.waitUntil(\n"
+        "    caches.open(CACHE).then(c => c.addAll(ASSETS))\n"
+        "  );\n"
+        "  self.skipWaiting();\n"
+        "});\n"
+        "\n"
+        "self.addEventListener('activate', e => {\n"
+        "  e.waitUntil(\n"
+        "    caches.keys().then(keys =>\n"
+        "      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))\n"
+        "    )\n"
+        "  );\n"
+        "  self.clients.claim();\n"
+        "});\n"
+        "\n"
+        "self.addEventListener('fetch', e => {\n"
+        "  e.respondWith(\n"
+        "    caches.match(e.request).then(cached => cached || fetch(e.request))\n"
+        "  );\n"
+        "});\n"
     )
-  );
-  self.clients.claim();
-});
-
-self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
-  );
-});
-"""
     sw_path = os.path.join(DOCS_DIR, "service-worker.js")
     with open(sw_path, "w") as f:
         f.write(sw)
