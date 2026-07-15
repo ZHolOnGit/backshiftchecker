@@ -25,5 +25,5 @@ serve: generate
 # GitHub Pages must be configured to serve from that branch root.
 deploy: generate
 	git add docs/
-	git commit -m "chore(deploy): regenerate static site" || echo "  nothing to commit"
+	git diff --cached --quiet || git commit -m "chore(deploy): regenerate static site"
 	git subtree push --prefix docs origin gh-pages
