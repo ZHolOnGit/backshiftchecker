@@ -366,16 +366,16 @@
         // Switch to the correct year tab
         const year = now.getFullYear();
         if (document.getElementById('year-' + year)) showYear(year);
-        // Scroll the current month card into view (below sticky header)
+        // Scroll the current month into view after the browser has painted
+        // the newly-visible year section (display:block needs a frame to lay out)
         const monthCard = cell.closest('.month-card');
         if (monthCard) {
-          // Use requestAnimationFrame to ensure the year section is visible before measuring
-          requestAnimationFrame(() => {
+          setTimeout(() => {
             const headerOffset = document.querySelector('header').offsetHeight
                                + document.querySelector('.year-tabs').offsetHeight;
-            const cardTop = monthCard.getBoundingClientRect().top + window.scrollY - headerOffset - 12;
-            window.scrollTo({ top: cardTop, behavior: 'instant' });
-          });
+            const top = monthCard.getBoundingClientRect().top + window.scrollY - headerOffset - 12;
+            window.scrollTo({ top, behavior: 'instant' });
+          }, 0);
         }
       }
 
