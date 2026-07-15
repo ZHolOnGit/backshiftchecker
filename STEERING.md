@@ -29,6 +29,13 @@ Generates 3 years of shift data (2026, 2027, 2028) viewable as a month-grid cale
 - 16px minimum font size (prevents Chrome auto-zoom)
 - PWA installable via Chrome "Add to Home Screen"
 
+## Dependency Management
+- **uv** manages the virtual environment and dependencies
+- `pyproject.toml` + `uv.lock` are the source of truth
+- Add packages with `uv add <package>`, run scripts with `uv run python3 generate.py`
+- Key dependency: `jinja2>=3.1.6` for HTML templating
+- Templates live in `templates/index.html.j2`
+
 ## Deployment
 - GitHub Pages from `gh-pages` branch (pushed via `git subtree push --prefix docs origin gh-pages`)
 - No build tools, no frameworks — vanilla HTML/CSS/JS only

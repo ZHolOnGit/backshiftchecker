@@ -1,29 +1,4 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-*.egg-info/
-dist/
-build/
-.eggs/
-*.egg
-
-# Virtual environments
 .venv/
-venv/
-env/
-.env
-
-# Generated site output (rebuilt by `make generate`)
+__pycache__/
+*.pyc
 docs/rota.json
-
-# macOS
-.DS_Store
-
-# Editor
-.vscode/
-.idea/
-*.swp
-*.swo
