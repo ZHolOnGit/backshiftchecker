@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#F59E0B" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Rota" />
+  <title>Rota</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <style>
+    /* ── Reset & base ───────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --amber:      #F59E0B;
+      --amber-light:#FEF3C7;
+      --red:        #EF4444;
+      --red-light:  #FEE2E2;
+      --off:        #F3F4F6;
+      --off-text:   #6B7280;
+      --bg:         #FFFFFF;
+      --surface:    #F9FAFB;
+      --border:     #E5E7EB;
+      --text:       #111827;
+      --text-muted: #6B7280;
+      --radius:     10px;
+      --shadow:     0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Roboto", "Segoe UI", sans-serif;
+      background: var(--surface);
+      color: var(--text);
+      padding-bottom: env(safe-area-inset-bottom, 16px);
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      background: var(--amber);
+      color: #fff;
+      padding: 16px 16px 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow);
+    }
+
+    header h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    header p {
+      font-size: 0.8rem;
+      opacity: 0.85;
+      margin-top: 2px;
+    }
+
+    /* ── Year tabs ───────────────────────────────────────────── */
+    .year-tabs {
+      display: flex;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      position: sticky;
+      top: 68px;
+      z-index: 99;
+    }
+
+    .year-tabs::-webkit-scrollbar { display: none; }
+
+    .year-tab {
+      flex: 1;
+      min-width: 80px;
+      padding: 12px 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-align: center;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 44px;
+    }
+
+    .year-tab.active {
+      color: var(--amber);
+      border-bottom-color: var(--amber);
+    }
+
+    /* ── Today banner ────────────────────────────────────────── */
+    .today-banner {
+      margin: 12px 12px 0;
+      padding: 12px 14px;
+      background: var(--bg);
+      border-radius: var(--radius);
+      border-left: 4px solid var(--amber);
+      box-shadow: var(--shadow);
+      font-size: 0.9rem;
+    }
+
+    .today-banner .label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+    }
+
+    .today-banner .value {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .today-banner .shift-badge {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .badge-DAYS     { background: var(--amber-light); color: #92400E; }
+    .badge-BACKSHIFT{ background: var(--red-light);   color: #991B1B; }
+    .badge-OFF      { background: var(--off);          color: var(--off-text); }
+
+    /* ── Year sections ───────────────────────────────────────── */
+    .year-section { display: none; padding: 12px 12px 24px; }
+    .year-section.active { display: block; }
+
+    /* ── Month card ──────────────────────────────────────────── */
+    .month-card {
+      background: var(--bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .month-header {
+      padding: 10px 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    /* ── Calendar grid ───────────────────────────────────────── */
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
+      background: var(--border);
+    }
+
+    .cal-dow {
+      background: var(--surface);
+      text-align: center;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: 6px 0;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .cal-day {
+      background: var(--bg);
+      min-height: 52px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 4px 2px;
+      position: relative;
+    }
+
+    .cal-day.empty { background: var(--surface); }
+
+    .cal-day.shift-DAYS     { background: var(--amber-light); }
+    .cal-day.shift-BACKSHIFT{ background: var(--red-light); }
+    .cal-day.shift-OFF      { background: var(--off); }
+
+    .cal-day.today {
+      outline: 2px solid var(--text);
+      outline-offset: -2px;
+      z-index: 1;
+    }
+
+    .day-num {
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1;
+      color: var(--text);
+    }
+
+    .cal-day.shift-DAYS     .day-num { color: #92400E; }
+    .cal-day.shift-BACKSHIFT .day-num { color: #991B1B; }
+    .cal-day.shift-OFF      .day-num { color: var(--off-text); }
+
+    .day-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+
+    .cal-day.shift-DAYS     .day-label { color: #B45309; }
+    .cal-day.shift-BACKSHIFT .day-label { color: #DC2626; }
+    .cal-day.shift-OFF      .day-label { display: none; }
+
+    /* ── Legend ──────────────────────────────────────────────── */
+    .legend {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 12px 12px 4px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .dot-days     { background: var(--amber-light); border: 1.5px solid var(--amber); }
+    .dot-backshift{ background: var(--red-light);   border: 1.5px solid var(--red); }
+    .dot-off      { background: var(--off);          border: 1.5px solid var(--border); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Rota</h1>
+    <p>{{ years[0] }}–{{ years[-1] }}</p>
+  </header>
+
+  <div class="year-tabs" role="tablist" aria-label="Year">
+    {% for year in years %}
+    <button
+      class="year-tab{% if loop.first %} active{% endif %}"
+      role="tab"
+      aria-selected="{{ 'true' if loop.first else 'false' }}"
+      aria-controls="year-{{ year }}"
+      data-year="{{ year }}"
+      onclick="showYear({{ year }})"
+    >{{ year }}</button>
+    {% endfor %}
+  </div>
+
+  <div id="today-banner" class="today-banner" style="display:none">
+    <div class="label">Today</div>
+    <div class="value" id="today-date"></div>
+    <div><span class="shift-badge" id="today-badge"></span></div>
+  </div>
+
+  <div class="legend" aria-hidden="true">
+    <div class="legend-item"><div class="legend-dot dot-days"></div> Days (7–5)</div>
+    <div class="legend-item"><div class="legend-dot dot-backshift"></div> Backshift (10–8)</div>
+    <div class="legend-item"><div class="legend-dot dot-off"></div> Off</div>
+  </div>
+
+  {% for year, months in calendar %}
+  <section
+    id="year-{{ year }}"
+    class="year-section{% if loop.first %} active{% endif %}"
+    role="tabpanel"
+    aria-label="{{ year }}"
+  >
+    {% for month_name, weeks in months %}
+    <div class="month-card">
+      <div class="month-header">{{ month_name }} {{ year }}</div>
+      <div class="cal-grid" role="grid" aria-label="{{ month_name }} {{ year }}">
+        <div class="cal-dow">Mon</div>
+        <div class="cal-dow">Tue</div>
+        <div class="cal-dow">Wed</div>
+        <div class="cal-dow">Thu</div>
+        <div class="cal-dow">Fri</div>
+        <div class="cal-dow">Sat</div>
+        <div class="cal-dow">Sun</div>
+        {% for week in weeks %}
+          {% for cell in week %}
+            {% if cell is none %}
+            <div class="cal-day empty" aria-hidden="true"></div>
+            {% else %}
+            <div
+              class="cal-day shift-{{ cell.shift }}"
+              data-date="{{ cell.date }}"
+              aria-label="{{ cell.date }}: {{ cell.shift }}"
+            >
+              <span class="day-num">{{ cell.day }}</span>
+              {% if cell.shift == 'DAYS' %}
+                <span class="day-label">Day</span>
+              {% elif cell.shift == 'BACKSHIFT' %}
+                <span class="day-label">Back</span>
+              {% endif %}
+            </div>
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endfor %}
+
+  <script>
+    // ── Embedded rota data ────────────────────────────────────
+    const ROTA_DATA = {{ rota_json }};
+
+    // Build a lookup map: "YYYY-MM-DD" → shift
+    const shiftMap = {};
+    ROTA_DATA.forEach(d => { shiftMap[d.date] = d.shift; });
+
+    // ── Year tab switching ────────────────────────────────────
+    function showYear(year) {
+      document.querySelectorAll('.year-section').forEach(s => {
+        s.classList.toggle('active', s.id === 'year-' + year);
+      });
+      document.querySelectorAll('.year-tab').forEach(t => {
+        const isActive = parseInt(t.dataset.year) === year;
+        t.classList.toggle('active', isActive);
+        t.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+    }
+
+    // ── Today highlight ───────────────────────────────────────
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function initToday() {
+      const now   = new Date();
+      const yyyy  = now.getFullYear();
+      const mm    = pad(now.getMonth() + 1);
+      const dd    = pad(now.getDate());
+      const today = `${yyyy}-${mm}-${dd}`;
+
+      // Highlight cell
+      const cell = document.querySelector(`[data-date="${today}"]`);
+      if (cell) {
+        cell.classList.add('today');
+        // Switch to the correct year tab
+        const year = now.getFullYear();
+        if (document.getElementById('year-' + year)) showYear(year);
+      }
+
+      // Today banner
+      const shift = shiftMap[today];
+      if (shift) {
+        const banner  = document.getElementById('today-banner');
+        const dateEl  = document.getElementById('today-date');
+        const badgeEl = document.getElementById('today-badge');
+        const labels  = { DAYS: 'Day shift (7–5)', BACKSHIFT: 'Backshift (10–8)', OFF: 'Day off' };
+
+        banner.style.display  = 'block';
+        dateEl.textContent    = now.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+        badgeEl.textContent   = labels[shift] || shift;
+        badgeEl.className     = `shift-badge badge-${shift}`;
+        // Tint banner border to match shift
+        if (shift === 'BACKSHIFT') banner.style.borderLeftColor = '#EF4444';
+        if (shift === 'OFF')       banner.style.borderLeftColor = '#9CA3AF';
+      }
+    }
+
+    initToday();
+  </script>
+
+  <script>
+    // ── Service worker registration ───────────────────────────
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    }
+  </script>
+
+</body>
+</html>

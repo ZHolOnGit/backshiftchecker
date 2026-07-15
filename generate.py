@@ -2,39 +2,48 @@
 generate.py
 
 Generates the static site for the rota web app.
-Run this script to rebuild docs/ — called by `make generate`.
+Run via: uv run python3 generate.py
 
 Steps:
   1. Generate 3 years of shift data from Shifts.py
-  2. Write docs/rota.json (used for validation and debugging)
-  3. Write docs/index.html (self-contained calendar page)
-  4. Write docs/manifest.json and docs/service-worker.js (PWA)
+  2. Write docs/rota.json (debug/validation artifact)
+  3. Build calendar data structure (year → month → weeks)
+  4. Render docs/index.html via Jinja2 template
+  5. Write docs/manifest.json and docs/service-worker.js (PWA)
 """
 
+import calendar
 import json
 import os
 from datetime import date
 
+from jinja2 import Environment, FileSystemLoader
+from markupsafe import Markup
+
 from Shifts import shids, ShiftType
+from make_icons import make_svg
 
-DOCS_DIR = os.path.join(os.path.dirname(__file__), "docs")
+# ── Config ────────────────────────────────────────────────────
 YEARS = [2026, 2027, 2028]
+DOCS_DIR = os.path.join(os.path.dirname(__file__), "docs")
+TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
+
+# ── Helpers ───────────────────────────────────────────────────
 
 def ensure_docs():
     os.makedirs(DOCS_DIR, exist_ok=True)
 
 
 def build_rota_data():
-    """Return rota as a list of dicts serialisable to JSON."""
-    all_days = shids(YEARS)
+    """Return rota as a flat list of dicts for JSON serialisation."""
     return [
         {
             "date": day.date.isoformat(),
             "shift": day.inWork.value,
             "weekday": day.weekDay,
         }
-        for day in all_days
+        for day in shids(YEARS)
     ]
 
 
@@ -46,31 +55,26 @@ def write_rota_json(data):
 
 
 def validate_rota_data(data):
-    """Run basic assertions on the generated data."""
+    """Basic assertions on generated data — fail fast if something is wrong."""
     assert len(data) == 1096, f"Expected 1096 days, got {len(data)}"
 
-    # No date gaps
-    from datetime import date, timedelta
+    from datetime import timedelta
     prev = date.fromisoformat(data[0]["date"])
     for entry in data[1:]:
         current = date.fromisoformat(entry["date"])
         assert current == prev + timedelta(days=1), f"Gap between {prev} and {current}"
         prev = current
 
-    # All shifts valid
-    valid = {"DAYS", "BACKSHIFT", "OFF"}
+    valid_shifts = {"DAYS", "BACKSHIFT", "OFF"}
     for entry in data:
-        assert entry["shift"] in valid, f"Invalid shift: {entry['shift']}"
+        assert entry["shift"] in valid_shifts, f"Invalid shift: {entry['shift']}"
 
-    # Anchor date is DAYS
     anchor = next(e for e in data if e["date"] == "2026-01-07")
-    assert anchor["shift"] == "DAYS", f"Anchor date wrong shift: {anchor['shift']}"
+    assert anchor["shift"] == "DAYS", f"Anchor date wrong: {anchor['shift']}"
 
-    # Leap day present
     leap = next((e for e in data if e["date"] == "2028-02-29"), None)
     assert leap is not None, "Leap day 2028-02-29 missing"
 
-    # Year counts
     for year, expected in [(2026, 365), (2027, 365), (2028, 366)]:
         count = sum(1 for e in data if e["date"].startswith(str(year)))
         assert count == expected, f"{year}: expected {expected} days, got {count}"
@@ -78,11 +82,151 @@ def validate_rota_data(data):
     print("  validation OK")
 
 
+def build_calendar(data):
+    """
+    Build a nested structure for the Jinja2 template:
+
+      [ (year, [ (month_name, [ week, ... ]), ... ]), ... ]
+
+    Each week is a list of 7 cells (Mon–Sun).
+    A cell is either None (padding) or a dict:
+      { date, day, shift }
+    """
+    # Index data by date string for quick lookup
+    by_date = {e["date"]: e for e in data}
+
+    result = []
+    for year in YEARS:
+        months = []
+        for month_num in range(1, 13):
+            month_name = calendar.month_name[month_num]
+
+            # calendar.monthcalendar returns weeks as lists of 7 ints (0 = no day)
+            # Week starts Monday by default
+            raw_weeks = calendar.monthcalendar(year, month_num)
+            weeks = []
+            for raw_week in raw_weeks:
+                week = []
+                for day_num in raw_week:
+                    if day_num == 0:
+                        week.append(None)
+                    else:
+                        d = date(year, month_num, day_num)
+                        entry = by_date.get(d.isoformat())
+                        week.append({
+                            "date": d.isoformat(),
+                            "day": day_num,
+                            "shift": entry["shift"] if entry else "OFF",
+                        })
+                weeks.append(week)
+            months.append((month_name, weeks))
+        result.append((year, months))
+    return result
+
+
+def render_html(data, cal):
+    # autoescape=False: rota_json is trusted data we generate ourselves.
+    # The template outputs it inside a <script> block, not into HTML attributes,
+    # so HTML-escaping quotes would break the JS — we want raw JSON.
+    env = Environment(
+        loader=FileSystemLoader(TEMPLATES_DIR),
+        autoescape=False,
+    )
+    template = env.get_template("index.html.j2")
+    rota_json_str = json.dumps(data, separators=(",", ":"))
+    html = template.render(
+        years=YEARS,
+        calendar=cal,
+        rota_json=Markup(rota_json_str),
+    )
+    return html
+
+
+def write_html(html):
+    path = os.path.join(DOCS_DIR, "index.html")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(f"  wrote {path}")
+
+
+def write_pwa_assets():
+    """Write manifest.json, service-worker.js, and SVG icons."""
+    # Icons
+    for size in [192, 512]:
+        path = os.path.join(DOCS_DIR, f"icon-{size}.svg")
+        with open(path, "w") as f:
+            f.write(make_svg(size))
+
+    manifest = {
+        "name": "Rota",
+        "short_name": "Rota",
+        "description": "Shift rota calendar",
+        "start_url": ".",
+        "display": "standalone",
+        "background_color": "#ffffff",
+        "theme_color": "#F59E0B",
+        "icons": [
+            {"src": f"icon-{s}.svg", "sizes": f"{s}x{s}", "type": "image/svg+xml"}
+            for s in [192, 512]
+        ],
+    }
+    manifest_path = os.path.join(DOCS_DIR, "manifest.json")
+    with open(manifest_path, "w") as f:
+        json.dump(manifest, f, indent=2)
+    print(f"  wrote {manifest_path}")
+
+    sw = """\
+const CACHE = 'rota-v1';
+const ASSETS = ['./'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(ASSETS))
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', e => {
+  e.respondWith(
+    caches.match(e.request).then(cached => cached || fetch(e.request))
+  );
+});
+"""
+    sw_path = os.path.join(DOCS_DIR, "service-worker.js")
+    with open(sw_path, "w") as f:
+        f.write(sw)
+    print(f"  wrote {sw_path}")
+
+
+# ── Main ──────────────────────────────────────────────────────
+
 if __name__ == "__main__":
     ensure_docs()
+
     print("Generating rota data...")
     data = build_rota_data()
     write_rota_json(data)
+
     print("Validating...")
     validate_rota_data(data)
-    print("Done.")
+
+    print("Building calendar structure...")
+    cal = build_calendar(data)
+
+    print("Rendering HTML...")
+    html = render_html(data, cal)
+    write_html(html)
+
+    print("Writing PWA assets...")
+    write_pwa_assets()
+
+    print("\nDone. Preview with: uv run python3 -m http.server 8000 --directory docs")
